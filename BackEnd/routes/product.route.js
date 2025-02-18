@@ -1,39 +1,48 @@
 import express from "express";
 import mongoose from "mongoose";
-import path from "path";
 import Product from "../models/product.model.js";
+import upload from "../middleware/upload.js";
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
-  res.sendFile(path.join(__dirname, "/index.html")); // Use __dirname to resolve file path
+router.get("/", upload.single("image"), async (req, res) => {
+  try {
+    const products = await Product.find({});
+    res.status(200).json({ success: true, data: products });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
 });
 
-router.get("/2",async (req, res) => {
-    try{
-        const products = await Product.find({});
-        res.status(200).json({success: true, data: products});
-    }
-    catch(err){
-        res.status(500).json({success: false, message: "Server error"});
-    }
-})
-
-router.post("/", async (req, res) => {
-  const { name, price, image } = req.body;
-  if (!name || !price || !image) {
-    return res.status(400).json({ message: "Please fill all the fields" });
+router.post("/", upload.single("image"), async (req, res) => {
+  const { name, price } = req.body;
+  const imageFile = req.file;
+  if (!name.trim() || !price || !imageFile.path) {
+    return res.status(400).json({
+      success: false,
+      message: "Name, price, and valid image are required",
+    });
   } else {
-    console.log(`${name} ${price} ${image}`);
-    const newProduct = new Product(req.body);
+    const image_path = imageFile.path;
+    const newProduct = new Product({
+      name: name.trim(),
+      price: price,
+      image: image_path,
+    });
     try {
       await newProduct.save();
-      res
-        .status(201)
-        .json({ success: true, message: "Product added successfully" });
+      res.status(201).json({
+        success: true,
+        message: "Product created successfully",
+        product: newProduct,
+      });
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ success: false, message: "Something went wrong" });
+      console.error("Product creation error:", err);
+      res.status(500).json({
+        success: false,
+        message: err.message || "Server error during product creation",
+      });
     }
   }
 });
